@@ -1,0 +1,16 @@
+---
+- name: Provision and Configure Todo App Stack with Nagios Monitoring on EC2
+  hosts: app_servers
+  become: true
+  vars:
+    app_dir: /opt/todoapp
+    backend_port: 5001
+    mongodb_uri: "{{ lookup('env', 'MONGODB_URI') | default('mongodb+srv://user:pass@cluster0.mongodb.net/todo_app?retryWrites=true&w=majority', true) }}"
+    nagios_admin_user: nagiosadmin
+    nagios_admin_password: "{{ lookup('env', 'NAGIOS_PASSWORD') | default('admin123', true) }}"
+
+  roles:
+    - common
+    - nagios
+    - backend
+    - frontend

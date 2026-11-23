@@ -1,0 +1,21 @@
+# Custom Nagios Service Monitoring for Todo App Architecture
+define service {
+    use                     generic-service
+    host_name               localhost
+    service_description     Nginx Web Server (Frontend & Reverse Proxy)
+    check_command           check_http!-p 80
+}
+
+define service {
+    use                     generic-service
+    host_name               localhost
+    service_description     Backend Express API Health Probe
+    check_command           check_http!-p {{ backend_port }}!-u /health
+}
+
+define service {
+    use                     generic-service
+    host_name               localhost
+    service_description     Backend Process Running (Node.js)
+    check_command           check_procs!-c 1:30 -C node
+}

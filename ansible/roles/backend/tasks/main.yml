@@ -1,0 +1,47 @@
+---
+- name: Create backend directory on EC2
+  ansible.builtin.file:
+    path: "{{ app_dir }}/backend"
+    state: directory
+    owner: ubuntu
+    group: ubuntu
+    mode: '0755'
+
+- name: Sync backend code to target EC2
+  ansible.posix.synchronize:
+    src: "{{ playbook_dir }}/../backend/"
+    dest: "{{ app_dir }}/backend/"
+    rsync_opts:
+      - "--exclude=node_modules"
+      - "--exclude=.git"
+      - "--exclude=.env"
+
+- name: Render .env configuration with MongoDB Atlas URI
+  ansible.builtin.template:
+    src: env.j2
+    dest: "{{ app_dir }}/backend/.env"
+    owner: ubuntu
+    group: ubuntu
+    mode: '0600'
+
+- name: Install backend production npm dependencies
+  community.general.npm:
+    path: "{{ app_dir }}/backend"
+    production: true
+  become_user: ubuntu
+
+- name: Start or restart Express backend with PM2
+  ansible.builtin.shell: |
+    pm2 describe todo-backend > /dev/null && pm2 restart todo-backend --update-env || pm2 start server.js --name "todo-backend"
+  args:
+    chdir: "{{ app_dir }}/backend"
+  become_user: ubuntu
+  environment:
+    NODE_ENV: production
+    PORT: "{{ backend_port }}"
+
+- name: Save PM2 process list for auto-boot recovery
+  ansible.builtin.shell: |
+    pm2 save
+    env PATH=$PATH:/usr/bin pm2 startup systemd -u ubuntu --hp /home/ubuntu || true
+  become_user: ubuntu

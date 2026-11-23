@@ -1,0 +1,60 @@
+---
+- name: Wait for system to be reachable
+  ansible.builtin.wait_for_connection:
+    timeout: 300
+
+- name: Update apt cache
+  ansible.builtin.apt:
+    update_cache: true
+    cache_valid_time: 3600
+
+- name: Install required system packages
+  ansible.builtin.apt:
+    name:
+      - curl
+      - git
+      - wget
+      - unzip
+      - build-essential
+      - ufw
+      - htop
+      - software-properties-common
+      - ca-certificates
+      - gnupg
+    state: present
+
+- name: Add NodeSource official GPG key
+  ansible.builtin.shell: |
+    mkdir -p /etc/apt/keyrings
+    curl -fsSL https://deb.nodesource.com/gpgkey/nodesource-repo.gpg.key | gpg --dearmor -o /etc/apt/keyrings/nodesource.gpg --yes
+  args:
+    creates: /etc/apt/keyrings/nodesource.gpg
+
+- name: Add NodeSource Node.js 20.x repository
+  ansible.builtin.shell: |
+    echo "deb [signed-by=/etc/apt/keyrings/nodesource.gpg] https://deb.nodesource.com/node_20.x nodistro main" | tee /etc/apt/sources.list.d/nodesource.list
+  args:
+    creates: /etc/apt/sources.list.d/nodesource.list
+
+- name: Update apt after adding NodeSource
+  ansible.builtin.apt:
+    update_cache: true
+
+- name: Install Node.js 20.x
+  ansible.builtin.apt:
+    name: nodejs
+    state: present
+
+- name: Install PM2 globally via npm
+  ansible.builtin.npm:
+    name: pm2
+    global: true
+    state: present
+
+- name: Create application root directory
+  ansible.builtin.file:
+    path: "{{ app_dir }}"
+    state: directory
+    owner: ubuntu
+    group: ubuntu
+    mode: '0755'

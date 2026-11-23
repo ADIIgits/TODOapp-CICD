@@ -1,0 +1,112 @@
+name: AWS EC2 CI/CD Pipeline (Terraform + Ansible + Nagios)
+
+on:
+  push:
+    branches: [ "main", "master" ]
+  workflow_dispatch:
+    inputs:
+      action:
+        description: 'Terraform Action'
+        required: true
+        default: 'apply'
+        type: choice
+        options:
+          - apply
+          - destroy
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    name: Code Quality & Lint
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Validate Backend Code
+        run: |
+          cd backend
+          node -c server.js utils/dateHelper.js routes/todos.js routes/analytics.js
+
+  infrastructure-and-deploy:
+    name: Provision with Terraform & Deploy with Ansible
+    needs: validate
+    runs-on: ubuntu-latest
+    env:
+      AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+      AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+      AWS_DEFAULT_REGION: ${{ secrets.AWS_REGION || 'us-east-1' }}
+      MONGODB_URI: ${{ secrets.MONGODB_URI }}
+      NAGIOS_PASSWORD: ${{ secrets.NAGIOS_PASSWORD || 'admin123' }}
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: 1.8.0
+
+      - name: Setup Python & Ansible
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install Ansible & Collections
+        run: |
+          pip install ansible
+          ansible-galaxy collection install community.general ansible.posix
+
+      # Terraform Provisioning
+      - name: Terraform Init
+        working-directory: ./terraform
+        run: terraform init
+
+      - name: Terraform Destroy (Manual Trigger If Selected)
+        if: ${{ github.event.inputs.action == 'destroy' }}
+        working-directory: ./terraform
+        run: terraform destroy -auto-approve
+
+      - name: Terraform Plan & Apply
+        if: ${{ github.event.inputs.action != 'destroy' }}
+        id: tf_apply
+        working-directory: ./terraform
+        run: |
+          terraform plan -out=tfplan
+          terraform apply -auto-approve tfplan
+
+      - name: Capture Public IP & URLs
+        if: ${{ github.event.inputs.action != 'destroy' }}
+        id: outputs
+        working-directory: ./terraform
+        run: |
+          EC2_IP=$(terraform output -raw instance_public_ip)
+          echo "EC2_IP=${EC2_IP}" >> $GITHUB_ENV
+          echo "### 🚀 Deployment Successful!" >> $GITHUB_STEP_SUMMARY
+          echo "- **App Web URL:** [http://${EC2_IP}](http://${EC2_IP})" >> $GITHUB_STEP_SUMMARY
+          echo "- **Backend Health Check:** [http://${EC2_IP}/health](http://${EC2_IP}/health)" >> $GITHUB_STEP_SUMMARY
+          echo "- **Nagios Monitoring:** [http://${EC2_IP}:8080/nagios](http://${EC2_IP}:8080/nagios) (User: \`nagiosadmin\`)" >> $GITHUB_STEP_SUMMARY
+
+      # Wait for EC2 instance SSH daemon to be ready
+      - name: Wait for SSH to be ready
+        if: ${{ github.event.inputs.action != 'destroy' }}
+        run: |
+          echo "Waiting for EC2 instance SSH daemon at ${{ env.EC2_IP }}..."
+          for i in {1..30}; do
+            ssh -o StrictHostKeyChecking=no -o ConnectTimeout=5 -i terraform/id_rsa ubuntu@${{ env.EC2_IP }} "echo SSH is up" && break || sleep 10
+          done
+
+      # Run Ansible Playbook
+      - name: Run Ansible Playbook to Configure EC2 & Run App
+        if: ${{ github.event.inputs.action != 'destroy' }}
+        working-directory: ./ansible
+        run: |
+          ansible-playbook -i inventory.ini playbook.yml

@@ -1,0 +1,73 @@
+---
+- name: Install Nginx web server
+  ansible.builtin.apt:
+    name: nginx
+    state: present
+
+- name: Create frontend directories on EC2
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: directory
+    owner: ubuntu
+    group: ubuntu
+    mode: '0755'
+  loop:
+    - "{{ app_dir }}/frontend"
+    - /var/www/html/todoapp
+
+- name: Sync frontend source code to target EC2
+  ansible.posix.synchronize:
+    src: "{{ playbook_dir }}/../frontend/"
+    dest: "{{ app_dir }}/frontend/"
+    rsync_opts:
+      - "--exclude=node_modules"
+      - "--exclude=dist"
+      - "--exclude=.git"
+
+- name: Install frontend npm dependencies
+  community.general.npm:
+    path: "{{ app_dir }}/frontend"
+  become_user: ubuntu
+
+- name: Build React production bundle with Vite
+  ansible.builtin.shell: npm run build
+  args:
+    chdir: "{{ app_dir }}/frontend"
+  become_user: ubuntu
+
+- name: Copy built React assets to web root
+  ansible.builtin.copy:
+    src: "{{ app_dir }}/frontend/dist/"
+    dest: /var/www/html/todoapp/
+    remote_src: true
+    owner: www-data
+    group: www-data
+    mode: '0755'
+
+- name: Configure Nginx site to serve React and reverse-proxy /api & /health
+  ansible.builtin.template:
+    src: nginx_todo.conf.j2
+    dest: /etc/nginx/sites-available/todoapp
+    owner: root
+    group: root
+    mode: '0644'
+  notify: Reload Nginx
+
+- name: Enable Nginx todoapp site
+  ansible.builtin.file:
+    src: /etc/nginx/sites-available/todoapp
+    dest: /etc/nginx/sites-enabled/todoapp
+    state: link
+  notify: Reload Nginx
+
+- name: Disable default Nginx configuration
+  ansible.builtin.file:
+    path: /etc/nginx/sites-enabled/default
+    state: absent
+  notify: Reload Nginx
+
+- name: Ensure Nginx is started and enabled
+  ansible.builtin.service:
+    name: nginx
+    state: started
+    enabled: true
