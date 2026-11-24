@@ -93,7 +93,7 @@ jobs:
           echo "### 🚀 Deployment Successful!" >> $GITHUB_STEP_SUMMARY
           echo "- **App Web URL:** [http://${EC2_IP}](http://${EC2_IP})" >> $GITHUB_STEP_SUMMARY
           echo "- **Backend Health Check:** [http://${EC2_IP}/health](http://${EC2_IP}/health)" >> $GITHUB_STEP_SUMMARY
-          echo "- **Nagios Monitoring:** [http://${EC2_IP}:8080/nagios](http://${EC2_IP}:8080/nagios) (User: \`nagiosadmin\`)" >> $GITHUB_STEP_SUMMARY
+          echo "- **Nagios Monitoring:** [http://${EC2_IP}:8080/nagios4/](http://${EC2_IP}:8080/nagios4/) (User: \`nagiosadmin\`)" >> $GITHUB_STEP_SUMMARY
 
       # Wait for EC2 instance SSH daemon to be ready
       - name: Wait for SSH to be ready

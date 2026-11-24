@@ -20,7 +20,7 @@ output "api_health_url" {
 
 output "nagios_url" {
   description = "Nagios Monitoring Web Interface URL"
-  value       = "http://${aws_instance.app_server.public_ip}:8080/nagios"
+  value       = "http://${aws_instance.app_server.public_ip}:8080/nagios4/"
 }
 
 output "ssh_command" {
