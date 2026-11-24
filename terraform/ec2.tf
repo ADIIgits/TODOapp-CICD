@@ -14,6 +14,11 @@ data "aws_ami" "ubuntu" {
   }
 }
 
+# Random suffix to prevent naming collisions on ephemeral CI/CD runs
+resource "random_id" "suffix" {
+  byte_length = 4
+}
+
 # Generate an SSH key pair dynamically
 resource "tls_private_key" "ec2_key" {
   algorithm = "RSA"
@@ -21,8 +26,8 @@ resource "tls_private_key" "ec2_key" {
 }
 
 resource "aws_key_pair" "generated_key" {
-  key_name   = "${var.project_name}-key"
-  public_key = tls_private_key.ec2_key.public_key_openssh
+  key_name_prefix = "${var.project_name}-key-"
+  public_key      = tls_private_key.ec2_key.public_key_openssh
 
   tags = {
     Name        = "${var.project_name}-key"
@@ -39,7 +44,7 @@ resource "local_file" "private_key" {
 
 # Security Group for EC2
 resource "aws_security_group" "app_sg" {
-  name        = "${var.project_name}-sg"
+  name_prefix = "${var.project_name}-sg-"
   description = "Security Group for Todo App and Nagios Monitoring"
 
   # SSH
