@@ -105,14 +105,34 @@
     mode: '0644'
   notify: Restart Nagios4
 
-- name: Ensure Apache2 service is started and enabled
-  ansible.builtin.service:
-    name: apache2
-    state: started
-    enabled: true
+- name: Fix Nagios cgi.cfg permissions to authorize nagiosadmin
+  ansible.builtin.replace:
+    path: /etc/nagios4/cgi.cfg
+    regexp: '^(authorized_for_[a-z_]+)=.*$'
+    replace: '\1=nagiosadmin,*'
 
-- name: Ensure Nagios4 service is started and enabled
+- name: Add www-data user to nagios group so CGIs can read status.dat
+  ansible.builtin.user:
+    name: www-data
+    groups: nagios
+    append: true
+
+- name: Ensure correct group permissions on Nagios var directory
+  ansible.builtin.file:
+    path: /var/lib/nagios4
+    state: directory
+    mode: '0750'
+    owner: nagios
+    group: nagios
+
+- name: Ensure Nagios4 service is restarted and enabled
   ansible.builtin.service:
     name: nagios4
-    state: started
+    state: restarted
+    enabled: true
+
+- name: Ensure Apache2 service is restarted and enabled
+  ansible.builtin.service:
+    name: apache2
+    state: restarted
     enabled: true
