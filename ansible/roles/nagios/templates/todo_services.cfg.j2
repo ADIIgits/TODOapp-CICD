@@ -2,7 +2,7 @@
 define service {
     use                     generic-service
     host_name               localhost
-    service_description     Nginx Web Server (Frontend & Reverse Proxy)
+    service_description     Nginx Web Server
     check_command           check_http!-p 80
 }
 
@@ -16,6 +16,6 @@ define service {
 define service {
     use                     generic-service
     host_name               localhost
-    service_description     Backend Process Running (Node.js)
+    service_description     Backend Process Running Nodejs
     check_command           check_procs!-c 1:30 -C node
 }
