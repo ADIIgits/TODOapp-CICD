@@ -23,7 +23,17 @@
               Listen 8443
       </IfModule>
     mode: '0644'
-  notify: Restart Apache2
+
+- name: Update Apache default VirtualHost to port 8080
+  ansible.builtin.replace:
+    path: /etc/apache2/sites-available/000-default.conf
+    regexp: '<VirtualHost \*:80>'
+    replace: '<VirtualHost *:8080>'
+
+- name: Restart Apache2 immediately so port 80 is released for Nginx
+  ansible.builtin.service:
+    name: apache2
+    state: restarted
 
 - name: Enable Apache CGI and Rewrite modules for Nagios
   community.general.apache2_module:
