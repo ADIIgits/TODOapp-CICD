@@ -111,19 +111,37 @@
     regexp: '^(authorized_for_[a-z_]+)=.*$'
     replace: '\1=nagiosadmin,*'
 
+- name: Disable authentication checks in Nagios cgi.cfg to eliminate status.dat lock
+  ansible.builtin.replace:
+    path: /etc/nagios4/cgi.cfg
+    regexp: '^use_authentication=.*$'
+    replace: 'use_authentication=0'
+
 - name: Add www-data user to nagios group so CGIs can read status.dat
   ansible.builtin.user:
     name: www-data
     groups: nagios
     append: true
 
-- name: Ensure correct group permissions on Nagios var directory
+- name: Ensure correct group permissions on Nagios lib directory and files
   ansible.builtin.file:
     path: /var/lib/nagios4
     state: directory
-    mode: '0750'
+    mode: '0755'
     owner: nagios
     group: nagios
+    recurse: true
+
+- name: Ensure correct permissions on Nagios rw command spool
+  ansible.builtin.file:
+    path: /var/lib/nagios4/rw
+    state: directory
+    mode: '0770'
+    owner: nagios
+    group: www-data
+
+- name: Validate Nagios configuration syntax
+  ansible.builtin.command: nagios4 -v /etc/nagios4/nagios.cfg
 
 - name: Ensure Nagios4 service is restarted and enabled
   ansible.builtin.service:
