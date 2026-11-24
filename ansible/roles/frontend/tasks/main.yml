@@ -24,9 +24,18 @@
       - "--exclude=dist"
       - "--exclude=.git"
 
-- name: Install frontend npm dependencies
-  community.general.npm:
+- name: Ensure ubuntu user owns frontend directory
+  ansible.builtin.file:
     path: "{{ app_dir }}/frontend"
+    state: directory
+    recurse: true
+    owner: ubuntu
+    group: ubuntu
+
+- name: Install frontend npm dependencies
+  ansible.builtin.shell: npm install
+  args:
+    chdir: "{{ app_dir }}/frontend"
   become_user: ubuntu
 
 - name: Build React production bundle with Vite

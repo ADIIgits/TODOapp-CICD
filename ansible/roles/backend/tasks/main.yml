@@ -16,6 +16,14 @@
       - "--exclude=.git"
       - "--exclude=.env"
 
+- name: Ensure ubuntu user owns backend directory
+  ansible.builtin.file:
+    path: "{{ app_dir }}/backend"
+    state: directory
+    recurse: true
+    owner: ubuntu
+    group: ubuntu
+
 - name: Render .env configuration with MongoDB Atlas URI
   ansible.builtin.template:
     src: env.j2
@@ -25,9 +33,9 @@
     mode: '0600'
 
 - name: Install backend production npm dependencies
-  community.general.npm:
-    path: "{{ app_dir }}/backend"
-    production: true
+  ansible.builtin.shell: npm install --omit=dev
+  args:
+    chdir: "{{ app_dir }}/backend"
   become_user: ubuntu
 
 - name: Start or restart Express backend with PM2
