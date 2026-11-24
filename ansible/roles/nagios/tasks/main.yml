@@ -48,14 +48,6 @@
   args:
     creates: /etc/apache2/conf-enabled/nagios4-cgi.conf
 
-- name: Ensure Apache serves / with a redirect to /nagios4/
-  ansible.builtin.copy:
-    dest: /var/www/html/index.html
-    content: '<meta http-equiv="refresh" content="0; url=/nagios4/">'
-    owner: www-data
-    group: www-data
-    mode: '0644'
-
 - name: Create Nagios admin web credentials
   ansible.builtin.shell: |
     htpasswd -b -c /etc/nagios4/htpasswd.users {{ nagios_admin_user }} '{{ nagios_admin_password }}'
@@ -68,6 +60,41 @@
     owner: root
     group: www-data
     mode: '0640'
+
+- name: Fix Nagios4 CGI Apache config permissions (Allow all authenticated users)
+  ansible.builtin.copy:
+    dest: /etc/apache2/conf-available/nagios4-cgi.conf
+    content: |
+      ScriptAlias /nagios4/cgi-bin /usr/lib/cgi-bin/nagios4
+      Alias /nagios4 /usr/share/nagios4/htdocs
+
+      <DirectoryMatch "^(?:/usr/share/nagios4/htdocs|/usr/lib/cgi-bin/nagios4)">
+          Options FollowSymLinks
+          DirectoryIndex index.php index.html
+          AllowOverride AuthConfig
+          AuthType Basic
+          AuthName "Nagios4 Access"
+          AuthUserFile /etc/nagios4/htpasswd.users
+          Require valid-user
+      </DirectoryMatch>
+
+      <Directory /usr/share/nagios4/htdocs>
+          Options Indexes FollowSymLinks
+          AllowOverride None
+          Require valid-user
+      </Directory>
+    owner: root
+    group: root
+    mode: '0644'
+  notify: Restart Apache2
+
+- name: Ensure Apache serves / with a redirect to /nagios4/
+  ansible.builtin.copy:
+    dest: /var/www/html/index.html
+    content: '<meta http-equiv="refresh" content="0; url=/nagios4/">'
+    owner: www-data
+    group: www-data
+    mode: '0644'
 
 - name: Deploy custom Nagios service check configuration for Todo App
   ansible.builtin.template:
