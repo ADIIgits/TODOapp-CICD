@@ -3,10 +3,19 @@
   ansible.builtin.wait_for_connection:
     timeout: 300
 
-- name: Update apt cache
+- name: Wait for cloud-init / apt lock to release
+  ansible.builtin.shell: |
+    while fuser /var/lib/dpkg/lock >/dev/null 2>&1 || fuser /var/lib/apt/lists/lock >/dev/null 2>&1 || fuser /var/lib/dpkg/lock-frontend >/dev/null 2>&1; do
+      sleep 5
+    done
+
+- name: Enable Ubuntu Universe repository
+  ansible.builtin.shell: |
+    add-apt-repository -y universe
+
+- name: Force update apt cache
   ansible.builtin.apt:
     update_cache: true
-    cache_valid_time: 3600
 
 - name: Install required system packages
   ansible.builtin.apt:
